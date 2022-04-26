@@ -492,6 +492,13 @@ exports.isOutPath = isOutPath;
 const escapeFunction = (roots) => {
     // ensure roots are always absolute
     roots = roots.map(root => path__default['default'].resolve(root));
+    // Returns true if in any root and false if outside all roots.
+    function isInRoot(linkPath) {
+        return roots.some(
+            root => !isOutPath(root, linkPath)
+        );
+    }
+
     function isEscape(linkTarget, linkPath) {
         if (!path__default['default'].isAbsolute(linkPath)) {
             linkPath = path__default['default'].resolve(linkPath);
@@ -499,13 +506,9 @@ const escapeFunction = (roots) => {
         if (!path__default['default'].isAbsolute(linkTarget)) {
             linkTarget = path__default['default'].resolve(linkTarget);
         }
-        for (const root of roots) {
-            if (isOutPath(root, linkTarget) && !isOutPath(root, linkPath)) {
-                // don't escape out of the root
-                return true;
-            }
-        }
-        return false;
+
+        // don't escape out of the root
+        return !isInRoot(root, linkTarget) && isInRoot(root, linkPath);
     }
     return { isEscape, isOutPath };
 };
