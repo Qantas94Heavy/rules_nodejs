@@ -1,0 +1,52 @@
+From 51c83aaeecb533a5156d3db2eefafe7d438e0861 Mon Sep 17 00:00:00 2001
+From: Uri Baghin <uri@canva.com>
+Date: Sun, 6 Jun 2021 16:27:32 +1000
+Subject: [PATCH] Remove non-determistic binary files.
+
+`node_modules` contains non-deterministic binary files, `.pyc` from python code and `.node` from binary modules. The `.pyc` precompiled python bytecode files can be removed, and the python interpreter can be left to compile the source code on demand, and `strip` removes the non-determistic debug symbols from `.node` files.
+
+Leaving the non-deterministic files in causes cache misses in the rules that depend on them.
+---
+ internal/npm_install/npm_install.bzl | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+
+diff --git internal/npm_install/npm_install.bzl internal/npm_install/npm_install.bzl
+index 5b466096..c610bab1 100644
+--- internal/npm_install/npm_install.bzl
++++ internal/npm_install/npm_install.bzl
+@@ -788,6 +788,33 @@ cd /D "{root}" && "{yarn}" {yarn_args}
+     _symlink_node_modules(repository_ctx)
+     _apply_post_install_patches(repository_ctx)
+ 
++    result = repository_ctx.execute([
++        "find",
++        repository_ctx.path("node_modules"),
++        "-type",
++        "f",
++        "-name",
++        "*.pyc",
++        "-delete",
++    ])
++    if result.return_code:
++        fail("deleting .pyc files failed: %s (%s)" % (result.stdout, result.stderr))
++    result = repository_ctx.execute([
++        "find",
++        repository_ctx.path("node_modules"),
++        "-type",
++        "f",
++        "-name",
++        "*.node",
++        "-exec",
++        "strip",
++        "-S",
++        "{}",
++        ";",
++    ])
++    if result.return_code:
++        fail("stripping .node files failed: %s (%s)" % (result.stdout, result.stderr))
++
+     _create_build_files(repository_ctx, "yarn_install", node, repository_ctx.attr.yarn_lock, repository_ctx.attr.generate_local_modules_build_files)
+ 
+ yarn_install = repository_rule(
+-- 
+2.31.1
